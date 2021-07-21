@@ -1,0 +1,1980 @@
+<!DOCTYPE html>
+<!-- saved from url=(0048)https://www.cnblogs.com/frankdeng/p/9301653.html -->
+<html lang="zh-cn"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="origin-when-crossorigin">
+    <meta name="description" content="一、RDD的概述 1.1 什么是RDD RDD（Resilient Distributed Dataset）叫做弹性分布式数据集，是Spark中最基本的数据抽象，它代表一个不可变、可分区、里面的元素可">
+    <meta property="og:description" content="一、RDD的概述 1.1 什么是RDD RDD（Resilient Distributed Dataset）叫做弹性分布式数据集，是Spark中最基本的数据抽象，它代表一个不可变、可分区、里面的元素可">
+    <meta http-equiv="Cache-Control" content="no-transform">
+    <meta http-equiv="Cache-Control" content="no-siteapp">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园</title>
+    <link id="favicon" rel="shortcut icon" href="https://common.cnblogs.com/favicon.svg" type="image/svg+xml">
+    
+    <link rel="stylesheet" href="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/blog-common.min.css">
+    <link id="MainCss" rel="stylesheet" href="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/bundle-thinkinside.min.css">
+    <link type="text/css" rel="stylesheet" href="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/custom.css">
+    <link id="mobile-style" media="only screen and (max-width: 767px)" type="text/css" rel="stylesheet" href="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/bundle-thinkinside-mobile.min.css">
+    
+    <link type="application/rss+xml" rel="alternate" href="https://www.cnblogs.com/frankdeng/rss">
+    <link type="application/rsd+xml" rel="EditURI" href="https://www.cnblogs.com/frankdeng/rsd.xml">
+    <link type="application/wlwmanifest+xml" rel="wlwmanifest" href="https://www.cnblogs.com/frankdeng/wlwmanifest.xml">
+    <script src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/osd.js.下载"></script><script async="" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/analytics.js.下载"></script><script type="text/javascript" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/encoder.js.下载"></script><script>
+        var currentBlogId = 428549;
+        var currentBlogApp = 'frankdeng';
+        var cb_enable_mathjax = false;
+        var isLogined = false;
+        var isBlogOwner = false;
+        var skinName = 'ThinkInside';
+        var visitorUserId = '';
+    </script>
+        <script>
+            var currentPostDateAdded = '2018-07-13 10:37';
+        </script>
+    <script src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/jquery-2.2.0.min.js.下载"></script>
+    <script src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/blog-common.min.js.下载"></script><style type="text/css">.medium-zoom-overlay{position:fixed;top:0;right:0;bottom:0;left:0;opacity:0;transition:opacity .3s;will-change:opacity}.medium-zoom--opened .medium-zoom-overlay{cursor:pointer;cursor:zoom-out;opacity:1}.medium-zoom-image{cursor:pointer;cursor:zoom-in;transition:transform .3s cubic-bezier(.2,0,.2,1)!important}.medium-zoom-image--hidden{visibility:hidden}.medium-zoom-image--opened{position:relative;cursor:pointer;cursor:zoom-out;will-change:transform}</style>
+    
+    
+    
+<style type="text/css">.heart{width: 10px;height: 10px;position: fixed;background: #f00;transform: rotate(45deg);-webkit-transform: rotate(45deg);-moz-transform: rotate(45deg);}.heart:after,.heart:before{content: '';width: inherit;height: inherit;background: inherit;border-radius: 50%;-webkit-border-radius: 50%;-moz-border-radius: 50%;position: absolute;}.heart:after{top: -5px;}.heart:before{left: -5px;}</style><script src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/share.js.下载"></script><meta http-equiv="origin-trial" content="A+b/H0b8RPXNaJgaNFpO0YOFuGK6myDQXlwnJB3SwzvNMfcndat4DZYMrP4ClJIzYWo3/yP2S+8FTZ/lpqbPAAEAAABueyJvcmlnaW4iOiJodHRwczovL2ltYXNkay5nb29nbGVhcGlzLmNvbTo0NDMiLCJmZWF0dXJlIjoiVHJ1c3RUb2tlbnMiLCJleHBpcnkiOjE2MjYyMjA3OTksImlzVGhpcmRQYXJ0eSI6dHJ1ZX0="><meta http-equiv="origin-trial" content="A9ZgbRtm4pU3oZiuNzOsKcC8ppFSZdcjP2qYcdQrFKVzkmiWH1kdYY1Mi9x7G8+PS8HV9Ha9Cz0gaMdKsiVZIgMAAAB7eyJvcmlnaW4iOiJodHRwczovL2RvdWJsZWNsaWNrLm5ldDo0NDMiLCJmZWF0dXJlIjoiVHJ1c3RUb2tlbnMiLCJleHBpcnkiOjE2MjYyMjA3OTksImlzU3ViZG9tYWluIjp0cnVlLCJpc1RoaXJkUGFydHkiOnRydWV9"><meta http-equiv="origin-trial" content="AxL6oBxcpn5rQDPKSAs+d0oxNyJYq2/4esBUh3Yx5z8QfcLu+AU8iFCXYRcr/CEEfDnkxxLTsvXPJFQBxHfvkgMAAACBeyJvcmlnaW4iOiJodHRwczovL2dvb2dsZXRhZ3NlcnZpY2VzLmNvbTo0NDMiLCJmZWF0dXJlIjoiVHJ1c3RUb2tlbnMiLCJleHBpcnkiOjE2MjYyMjA3OTksImlzU3ViZG9tYWluIjp0cnVlLCJpc1RoaXJkUGFydHkiOnRydWV9"><meta http-equiv="origin-trial" content="A9KPtG5kl3oLTk21xqynDPGQ5t18bSOpwt0w6kGa6dEWbuwjpffmdUpR3W+faZDubGT+KIk2do0BX2ca16x8qAcAAACBeyJvcmlnaW4iOiJodHRwczovL2dvb2dsZXN5bmRpY2F0aW9uLmNvbTo0NDMiLCJmZWF0dXJlIjoiVHJ1c3RUb2tlbnMiLCJleHBpcnkiOjE2MjYyMjA3OTksImlzU3ViZG9tYWluIjp0cnVlLCJpc1RoaXJkUGFydHkiOnRydWV9"><meta http-equiv="origin-trial" content="AookgM0K6zABiuRTZwpn+R95G2CKmUH/2+zf2kS/QpMlVZ6HTI6QekeLkrJyxeIi62p2ejcQTF464pkdlx0Nwg0AAABmeyJvcmlnaW4iOiJodHRwczovL3d3dy5nb29nbGUuY29tOjQ0MyIsImZlYXR1cmUiOiJUcnVzdFRva2VucyIsImV4cGlyeSI6MTYzNDA4MzE5OSwiaXNTdWJkb21haW4iOnRydWV9"><meta http-equiv="origin-trial" content="A3HucHUo1oW9s+9kIKz8mLkbcmdaj5lxt3eiIMp1Nh49dkkBlg1Fhg4Fd/r0vL69mRRA36YutI9P/lJUfL8csQoAAACFeyJvcmlnaW4iOiJodHRwczovL2RvdWJsZWNsaWNrLm5ldDo0NDMiLCJmZWF0dXJlIjoiQ29udmVyc2lvbk1lYXN1cmVtZW50IiwiZXhwaXJ5IjoxNjI2MjIwNzk5LCJpc1N1YmRvbWFpbiI6dHJ1ZSwiaXNUaGlyZFBhcnR5Ijp0cnVlfQ=="><meta http-equiv="origin-trial" content="A0OysezhLoCRYomumeYlubLurZTCmsjTb087OvtCy95jNM65cfEsbajrJnhaGwiTxhz38ZZbm+UhUwQuXfVPTg0AAACLeyJvcmlnaW4iOiJodHRwczovL2dvb2dsZXN5bmRpY2F0aW9uLmNvbTo0NDMiLCJmZWF0dXJlIjoiQ29udmVyc2lvbk1lYXN1cmVtZW50IiwiZXhwaXJ5IjoxNjI2MjIwNzk5LCJpc1N1YmRvbWFpbiI6dHJ1ZSwiaXNUaGlyZFBhcnR5Ijp0cnVlfQ=="><meta http-equiv="origin-trial" content="AxoOxdZQmIoA1WeAPDixRAeWDdgs7ZtVFfH2y19ziTgD1iaHE5ZGz2UdSjubkWvob9C5PrjUfkWi4ZSLgWk3Xg8AAACLeyJvcmlnaW4iOiJodHRwczovL2dvb2dsZXRhZ3NlcnZpY2VzLmNvbTo0NDMiLCJmZWF0dXJlIjoiQ29udmVyc2lvbk1lYXN1cmVtZW50IiwiZXhwaXJ5IjoxNjI2MjIwNzk5LCJpc1N1YmRvbWFpbiI6dHJ1ZSwiaXNUaGlyZFBhcnR5Ijp0cnVlfQ=="><meta http-equiv="origin-trial" content="A7+rMYR5onPnACrz+niKSeFdH3xw1IyHo2AZSHmxrofRk9w4HcQPMYcpBUKu6OQ6zsdxf4m/vqa6tG6Na4OLpAQAAAB4eyJvcmlnaW4iOiJodHRwczovL2ltYXNkay5nb29nbGVhcGlzLmNvbTo0NDMiLCJmZWF0dXJlIjoiQ29udmVyc2lvbk1lYXN1cmVtZW50IiwiZXhwaXJ5IjoxNjI2MjIwNzk5LCJpc1RoaXJkUGFydHkiOnRydWV9"><meta http-equiv="origin-trial" content="AwfG8hAcHnPa/kJ1Co0EvG/K0F9l1s2JZGiDLt2mhC3QI5Fh4qmsmSwrWObZFbRC9ieDaSLU6lHRxhGUF/i9sgoAAACBeyJvcmlnaW4iOiJodHRwczovL2RvdWJsZWNsaWNrLm5ldDo0NDMiLCJmZWF0dXJlIjoiSW50ZXJlc3RDb2hvcnRBUEkiLCJleHBpcnkiOjE2MjYyMjA3OTksImlzU3ViZG9tYWluIjp0cnVlLCJpc1RoaXJkUGFydHkiOnRydWV9"><meta http-equiv="origin-trial" content="AwQ7dCmHkvR6FuOFxAuNnktYSQrGbL4dF+eBkrwNLALc69Wr//PnO1yzns3pjUoCaYbKHtVcnng2hU+8OUm0PAYAAACHeyJvcmlnaW4iOiJodHRwczovL2dvb2dsZXN5bmRpY2F0aW9uLmNvbTo0NDMiLCJmZWF0dXJlIjoiSW50ZXJlc3RDb2hvcnRBUEkiLCJleHBpcnkiOjE2MjYyMjA3OTksImlzU3ViZG9tYWluIjp0cnVlLCJpc1RoaXJkUGFydHkiOnRydWV9"><meta http-equiv="origin-trial" content="AysVDPGQTLD/Scn78x4mLwB1tMfje5jwUpAAzGRpWsr1NzoN7MTFhT3ClmImi2svDZA7V6nWGIV8YTPsSRTe0wYAAACHeyJvcmlnaW4iOiJodHRwczovL2dvb2dsZXRhZ3NlcnZpY2VzLmNvbTo0NDMiLCJmZWF0dXJlIjoiSW50ZXJlc3RDb2hvcnRBUEkiLCJleHBpcnkiOjE2MjYyMjA3OTksImlzU3ViZG9tYWluIjp0cnVlLCJpc1RoaXJkUGFydHkiOnRydWV9"><script src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/pubads_impl_2021061703.js.下载" async=""></script><link rel="preload" href="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/f.txt" as="script"><script type="text/javascript" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/f.txt"></script></head>
+<body class="no-navbar">
+    <a name="top"></a>
+            <div id="bannerbar" class="bannerbar-mobile formobile">
+                <a href="https://developer.aliyun.com/topic/n2021?channel=yy_developer?utm_content=g_1000278325" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;aliyun-blog-bannerbar-mobile&#39;)">
+                    <img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/35695-20210616191110366-1976389001.jpg" alt="">
+                </a>
+            </div>
+    <div id="top_nav" class="navbar forpc navbar-custom">
+        <nav id="nav_main" class="navbar-main">
+            <ul id="nav_left" class="navbar-list navbar-left">
+                <li class="navbar-branding"><a href="https://www.cnblogs.com/" title="开发者的网上家园"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/logo.svg" alt="博客园Logo"></a></li>
+                <li><a href="https://www.cnblogs.com/" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;skin-navbar-sitehome&#39;)">首页</a></li>
+                <li><a href="https://news.cnblogs.com/" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;skin-navbar-news&#39;)">新闻</a></li>
+                <li><a href="https://q.cnblogs.com/" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;skin-navbar-q&#39;)">博问</a></li>
+                <li><a id="nav_brandzone" href="https://brands.cnblogs.com/" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;skin-navbar-brands&#39;)">专区</a></li>
+                <li><a href="https://ing.cnblogs.com/" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;skin-navbar-ing&#39;)">闪存</a></li>
+                <li><a href="https://edu.cnblogs.com/" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;skin-navbar-edu&#39;)">班级</a></li>
+            </ul>
+            <ul id="nav_right" class="navbar-list navbar-right">
+                <li>
+                    <form id="zzk_search" class="navbar-search" action="https://zzk.cnblogs.com/s" method="get">
+                        <input name="w" id="zzk_search_input" placeholder="代码改变世界" type="text" tabindex="3">
+                        <button type="submit" id="zzk_search_button">
+                            <img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/search.svg" alt="搜索">
+                        </button>
+                    </form>
+                </li>
+                <li id="navbar_login_status" class="navbar-list">
+                    <a class="navbar-user-info navbar-blog" href="https://i.cnblogs.com/EditPosts.aspx?opt=1" alt="写随笔" title="写随笔" style="display: none;">
+                        <img id="new_post_icon" class="navbar-icon" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/newpost.svg" alt="写随笔">
+                    </a>
+                    <a id="navblog-myblog-icon" class="navbar-user-info navbar-blog" href="https://passport.cnblogs.com/GetBlogApplyStatus.aspx" alt="我的博客" title="我的博客" style="display: none;">
+                        <img id="myblog_icon" class="navbar-icon" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/myblog.svg" alt="我的博客">
+                    </a>
+                    <a class="navbar-user-info navbar-message navbar-icon-wrapper" href="https://msg.cnblogs.com/" alt="短消息" title="短消息" style="display: none;">
+                        <img id="msg_icon" class="navbar-icon" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/message.svg" alt="短消息">
+                        <span id="msg_count" style="display: none"></span>
+                    </a>
+                    <div id="user_info" class="navbar-user-info dropdown" style="display: none;">
+                        <a class="dropdown-button" href="https://home.cnblogs.com/">
+                            <img id="user_icon" class="navbar-avatar" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/avatar-default.svg" alt="用户头像">
+                        </a>
+                        <div class="dropdown-menu">
+                            <a id="navblog-myblog-text" href="https://passport.cnblogs.com/GetBlogApplyStatus.aspx">我的博客</a>
+                            <a href="https://home.cnblogs.com/">我的园子</a>
+                            <a href="https://account.cnblogs.com/settings/account">账号设置</a>
+                            <a href="javascript:void(0)" id="navbar_lite_mode_toggle" title="简洁模式会使用简洁款皮肤显示所有博客">
+    简洁模式 <img id="navbar_lite_mode_on" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/lite-mode-check.svg" class="hide"><span id="navbar_lite_mode_spinner" class="hide">...</span>
+</a>
+                            <a href="javascript:void(0)" onclick="account.logout();">退出登录</a>
+                        </div>
+                    </div>
+                    <a class="navbar-anonymous" href="https://account.cnblogs.com/signup/" style="display: inline;">注册</a>
+                    <a class="navbar-anonymous" href="javascript:void(0);" onclick="account.login()" style="display: inline;">登录</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
+    <div id="page_begin_html"><script type="text/javascript">window['__document_write_ajax_callbacks__']['2']();</script><script type="text/javascript">window['__document_write_ajax_callbacks__']['1']();</script>
+
+<span id="back-to-top"><a href="https://www.cnblogs.com/frankdeng/p/9301653.html#top">返回顶部</a></span>
+
+<a href="https://github.com/dengtianxiang"><img style="position: absolute; top: 37px; right: 0; border: 0" alt="Fork me on GitHub" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1054809-20171203034734069-560687701.png"></a></div>
+    <!--done-->
+<div id="home">
+<div id="header">
+	<div id="blogTitle">
+        <a id="lnkBlogLogo" href="https://www.cnblogs.com/frankdeng/"><img id="blogLogo" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/logo.gif" alt="返回主页"></a>		
+		
+<!--done-->
+<h1><a id="Header1_HeaderTitle" class="headermaintitle HeaderMainTitle" href="https://www.cnblogs.com/frankdeng/">Frankdeng</a>
+</h1>
+<h2></h2>
+
+
+
+
+		
+	</div><!--end: blogTitle 博客的标题和副标题 -->
+	<div id="navigator">
+		
+<ul id="navList">
+<li><a id="blog_nav_sitehome" class="menu" href="https://www.cnblogs.com/">
+博客园</a>
+</li>
+<li>
+<a id="blog_nav_myhome" class="menu" href="https://www.cnblogs.com/frankdeng/">
+首页</a>
+</li>
+<li>
+
+<a id="blog_nav_newpost" class="menu" href="https://i.cnblogs.com/EditPosts.aspx?opt=1">
+新随笔</a>
+</li>
+<li>
+<a id="blog_nav_contact" class="menu" href="https://msg.cnblogs.com/send/Frankdeng">
+联系</a></li>
+<li>
+<a id="blog_nav_rss" class="menu" href="javascript:void(0)" data-rss="https://www.cnblogs.com/frankdeng/rss/">
+订阅</a>
+<!--<partial name="./Shared/_XmlLink.cshtml" model="Model" /></li>--></li>
+<li>
+<a id="blog_nav_admin" class="menu" href="https://i.cnblogs.com/">
+管理</a>
+</li>
+</ul>
+
+
+		<div class="blogStats">
+			<span id="stats_post_count">随笔 - 125&nbsp; </span>
+<span id="stats_article_count">文章 - 0&nbsp; </span>
+<span id="stats-comment_count">评论 - 85&nbsp; </span>
+<span id="stats-total-view-count">阅读 - 
+<span title="总阅读数: 1079863">
+107万</span></span>
+
+		</div><!--end: blogStats -->
+	</div><!--end: navigator 博客导航栏 -->
+</div><!--end: header 头部 -->
+<div id="main">
+	<div id="mainContent">
+	<div class="forFlow">
+		<div id="post_detail">
+    <!--done-->
+    <div id="topics">
+        <div class="post">
+            <h1 class="postTitle">
+                
+<a id="cb_post_title_url" class="postTitle2 vertical-middle" href="https://www.cnblogs.com/frankdeng/p/9301653.html">
+    <span>Spark（三）RDD与广播变量、累加器</span>
+    
+
+
+
+</a>
+
+            </h1>
+            <div class="clear"></div>
+            <div class="postBody">
+                <div id="cnblogs_post_body" class="blogpost-body blogpost-body-html">
+<h2 id="blogTitle0">一、RDD的概述</h2>
+<h3 id="blogTitle1">1.1 什么是RDD&nbsp;</h3>
+<p>RDD（Resilient Distributed Dataset）叫做<strong>弹性分布式数据集</strong>，<strong>是Spark中最基本的数据抽象</strong>，它代表一个不可变、可分区、里面的元素可并行计算的集合。RDD具有数据流模型的特点：自动容错、位置感知性调度和可伸缩性。RDD允许用户在执行多个查询时显式地将工作集缓存在内存中，后续的查询能够重用工作集，这极大地提升了查询速度。</p>
+<h3 id="blogTitle2">1.2 RDD的属性</h3>
+<p>（1）一组分片（Partition），即数据集的基本组成单位。对于RDD来说，每个分片都会被一个计算任务处理，并决定并行计算的粒度。用户可以在创建RDD时指定RDD的分片个数，如果没有指定，那么就会采用默认值。默认值就是程序所分配到的CPU Core的数目。</p>
+<p>（2）一个计算每个分区的函数。Spark中RDD的计算是以分片为单位的，每个RDD都会实现compute函数以达到这个目的。compute函数会对迭代器进行复合，不需要保存每次计算的结果。</p>
+<p>（3）RDD之间的依赖关系。RDD的每次转换都会生成一个新的RDD，所以RDD之间就会形成类似于流水线一样的前后依赖关系。在部分分区数据丢失时，Spark可以通过这个依赖关系重新计算丢失的分区数据，而不是对RDD的所有分区进行重新计算。</p>
+<p>（4）一个Partitioner，即RDD的分片函数。当前Spark中实现了两种类型的分片函数，一个是基于哈希的HashPartitioner，另外一个是基于范围的RangePartitioner。只有对于于key-value的RDD，才会有Partitioner，非key-value的RDD的Parititioner的值是None。Partitioner函数不但决定了RDD本身的分片数量，也决定了parent RDD Shuffle输出时的分片数量。</p>
+<p>（5）一个列表，存储存取每个Partition的优先位置（preferred location）。对于一个HDFS文件来说，这个列表保存的就是每个Partition所在的块的位置。按照“移动数据不如移动计算”的理念，Spark在进行任务调度的时候，会尽可能地将计算任务分配到其所要处理数据块的存储位置。</p>
+<h3 id="blogTitle3">1.3 WordCount粗图解RDD</h3>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180421133911520-1150689001.png" alt="" width="1200" class="medium-zoom-image"></p>
+<p>其中hello.txt</p>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180421134031551-1670646166.png" alt=""></p>
+<h2 id="blogTitle4">二、RDD的创建方式</h2>
+<h3 id="blogTitle5">2.1 读取文件生成</h3>
+<p>可以从Hadoop支持的任何存储源创建分布式数据集，包括本地文件系统，HDFS，Cassandra，HBase等</p>
+<div class="cnblogs_code">
+<pre>scala&gt; val file = sc.textFile(<span style="color: rgba(128, 0, 0, 1)">"</span><span style="color: rgba(128, 0, 0, 1)">/spark/hello.txt</span><span style="color: rgba(128, 0, 0, 1)">"</span><span style="color: rgba(0, 0, 0, 1)">)</span></pre>
+</div>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180421134515478-653027491.png" alt="" width="1024" class="medium-zoom-image"></p>
+<h3 id="blogTitle6">2.2 并行化方式创建<span lang="EN-US">RDD</span></h3>
+<p>由一个已经存在的Scala集合创建。</p>
+<div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div>
+<pre>scala&gt; val array = Array(<span style="color: rgba(128, 0, 128, 1)">1</span>,<span style="color: rgba(128, 0, 128, 1)">2</span>,<span style="color: rgba(128, 0, 128, 1)">3</span>,<span style="color: rgba(128, 0, 128, 1)">4</span>,<span style="color: rgba(128, 0, 128, 1)">5</span><span style="color: rgba(0, 0, 0, 1)">)
+array: Array[Int] </span>= Array(<span style="color: rgba(128, 0, 128, 1)">1</span>, <span style="color: rgba(128, 0, 128, 1)">2</span>, <span style="color: rgba(128, 0, 128, 1)">3</span>, <span style="color: rgba(128, 0, 128, 1)">4</span>, <span style="color: rgba(128, 0, 128, 1)">5</span><span style="color: rgba(0, 0, 0, 1)">)
+
+scala</span>&gt; val rdd =<span style="color: rgba(0, 0, 0, 1)"> sc.parallelize(array)
+rdd: org.apache.spark.rdd.RDD[Int] </span>= ParallelCollectionRDD[<span style="color: rgba(128, 0, 128, 1)">27</span>] at parallelize at &lt;console&gt;:<span style="color: rgba(128, 0, 128, 1)">26</span><span style="color: rgba(0, 0, 0, 1)">
+
+scala</span>&gt; </pre>
+<div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div></div>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180421134820158-111255712.png" alt="" width="1024" class="medium-zoom-image"></p>
+<h3 id="blogTitle7">2.3 其他方式</h3>
+<p><span lang="EN-US">读取数据库等等其他的操作。也可以生成<span lang="EN-US">RDD。</span></span></p>
+<p><span lang="EN-US">RDD可以通过其他的<span lang="EN-US">RDD转换而来的。</span></span></p>
+<h2 id="blogTitle8">三、RDD编程API</h2>
+<p>Spark支持两个类型（算子）操作：Transformation和Action</p>
+<h3 id="blogTitle9">3.1 Transformation</h3>
+<p>主要做的是就是将一个已有的RDD生成另外一个RDD。Transformation具有<strong>lazy</strong><strong>特性(延迟加载)</strong>。Transformation算子的代码不会真正被执行。只有当我们的程序里面遇到一个action算子的时候，代码才会真正的被执行。这种设计让Spark更加有效率地运行。</p>
+<p><strong>常用的Transformation</strong>：</p>
+<div class="table-wrapper"><table style="height: 2069px; width: 942px" border="1" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td valign="top" width="261">
+<p align="center"><strong>转换</strong></p>
+</td>
+<td valign="top" width="307">
+<p align="center"><strong>含义</strong></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>map</strong>(func)</p>
+</td>
+<td valign="top" width="307">
+<p>返回一个新的RDD，该RDD由每一个输入元素经过func函数转换后组成</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>filter</strong>(func)</p>
+</td>
+<td valign="top" width="307">
+<p>返回一个新的RDD，该RDD由经过func函数计算后返回值为true的输入元素组成</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>flatMap</strong>(func)</p>
+</td>
+<td valign="top" width="307">
+<p>类似于map，但是每一个输入元素可以被映射为0或多个输出元素（所以func应该返回一个序列，而不是单一元素）</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>mapPartitions</strong>(func)</p>
+</td>
+<td valign="top" width="307">
+<p>类似于map，但独立地在RDD的每一个分片上运行，因此在类型为T的RDD上运行时，func的函数类型必须是Iterator[T] =&gt; Iterator[U]</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>mapPartitionsWithIndex</strong>(func)</p>
+</td>
+<td valign="top" width="307">
+<p>类似于mapPartitions，但func带有一个整数参数表示分片的索引值，因此在类型为T的RDD上运行时，func的函数类型必须是</p>
+<p>(Int, Interator[T]) =&gt; Iterator[U]</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>sample</strong>(withReplacement, fraction, seed)</p>
+</td>
+<td valign="top" width="307">
+<p>根据fraction指定的比例对数据进行采样，可以选择是否使用随机数进行替换，seed用于指定随机数生成器种子</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>union</strong>(otherDataset)</p>
+</td>
+<td valign="top" width="307">
+<p>对源RDD和参数RDD求并集后返回一个新的RDD</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>intersection</strong>(otherDataset)</p>
+</td>
+<td valign="top" width="307">
+<p>对源RDD和参数RDD求交集后返回一个新的RDD（交集）</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>distinct</strong>([numTasks]))</p>
+</td>
+<td valign="top" width="307">
+<p>对源RDD进行去重后返回一个新的RDD</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>groupByKey</strong>([numTasks])</p>
+</td>
+<td valign="top" width="307">
+<p>在一个(K,V)的RDD上调用，返回一个(K, Iterator[V])的RDD</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>reduceByKey</strong>(func, [numTasks])</p>
+</td>
+<td valign="top" width="307">
+<p>在一个(K,V)的RDD上调用，返回一个(K,V)的RDD，使用指定的reduce函数，将相同key的值聚合到一起，与groupByKey类似，reduce任务的个数可以通过第二个可选的参数来设置</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>aggregateByKey</strong>(zeroValue)(seqOp, combOp, [numTasks])</p>
+</td>
+<td valign="top" width="307">
+<p>先按分区聚合 再总的聚合&nbsp;&nbsp; 每次要跟初始值交流 例如：aggregateByKey(0)(_+_,_+_) 对k/y的RDD进行操作</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>sortByKey</strong>([ascending], [numTasks])</p>
+</td>
+<td valign="top" width="307">
+<p>在一个(K,V)的RDD上调用，K必须实现Ordered接口，返回一个按照key进行排序的(K,V)的RDD</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>sortBy</strong>(func,[ascending], [numTasks])</p>
+</td>
+<td valign="top" width="307">
+<p>与sortByKey类似，但是更灵活 第一个参数是根据什么排序&nbsp; 第二个是怎么排序 false倒序&nbsp;&nbsp; 第三个排序后分区数&nbsp; 默认与原RDD一样</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>join</strong>(otherDataset, [numTasks])</p>
+</td>
+<td valign="top" width="307">
+<p>在类型为(K,V)和(K,W)的RDD上调用，返回一个相同key对应的所有元素对在一起的(K,(V,W))的RDD&nbsp; 相当于内连接（求交集）</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>cogroup</strong>(otherDataset, [numTasks])</p>
+</td>
+<td valign="top" width="307">
+<p>在类型为(K,V)和(K,W)的RDD上调用，返回一个(K,(Iterable&lt;V&gt;,Iterable&lt;W&gt;))类型的RDD</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>cartesian</strong>(otherDataset)</p>
+</td>
+<td valign="top" width="307">
+<p>两个RDD的笛卡尔积&nbsp; 的成很多个K/V</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>pipe</strong>(command, [envVars])</p>
+</td>
+<td valign="top" width="307">
+<p>调用外部程序</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>coalesce</strong>(numPartitions<strong>)&nbsp;&nbsp;&nbsp; </strong></p>
+</td>
+<td valign="top" width="307">
+<p>重新分区 第一个参数是要分多少区，第二个参数是否shuffle 默认false&nbsp; 少分区变多分区 true&nbsp;&nbsp; 多分区变少分区 false</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>repartition</strong>(numPartitions)</p>
+</td>
+<td valign="top" width="307">
+<p>重新分区 必须shuffle&nbsp; 参数是要分多少区&nbsp; 少变多</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>repartitionAndSortWithinPartitions</strong>(partitioner)</p>
+</td>
+<td valign="top" width="307">
+<p>重新分区+排序&nbsp; 比先分区再排序效率高&nbsp; 对K/V的RDD进行操作</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>foldByKey</strong>(zeroValue)(seqOp)</p>
+</td>
+<td valign="top" width="307">
+<p>该函数用于K/V做折叠，合并处理 ，与aggregate类似&nbsp;&nbsp; 第一个括号的参数应用于每个V值&nbsp; 第二括号函数是聚合例如：_+_</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>combineByKey</strong></p>
+</td>
+<td valign="top" width="307">
+<p>合并相同的key的值 rdd1.combineByKey(x =&gt; x, (a: Int, b: Int) =&gt; a + b, (m: Int, n: Int) =&gt; m + n)</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>partitionBy</strong><strong>（partitioner）</strong></p>
+</td>
+<td valign="top" width="307">
+<p>对RDD进行分区&nbsp; partitioner是分区器 例如new HashPartition(2</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>cache</strong></p>
+</td>
+<td rowspan="2" valign="top" width="307">
+<p>RDD缓存，可以避免重复计算从而减少时间，区别：cache内部调用了persist算子，cache默认就一个缓存级别MEMORY-ONLY ，而persist则可以选择缓存级别</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>persist</strong></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>Subtract</strong><strong>（rdd）</strong></p>
+</td>
+<td valign="top" width="307">
+<p>返回前rdd元素不在后rdd的rdd（差集）</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>leftOuterJoin</strong></p>
+</td>
+<td valign="top" width="307">
+<p>leftOuterJoin类似于SQL中的左外关联left outer join，返回结果以前面的RDD为主，关联不上的记录为空。只能用于两个RDD之间的关联，如果要多个RDD关联，多关联几次即可。</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>rightOuterJoin</strong></p>
+</td>
+<td valign="top" width="307">
+<p>rightOuterJoin类似于SQL中的有外关联right outer join，返回结果以参数中的RDD为主，关联不上的记录为空。只能用于两个RDD之间的关联，如果要多个RDD关联，多关联几次即可</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="261">
+<p><strong>subtractByKey</strong></p>
+</td>
+<td valign="top" width="307">
+<p>substractByKey和基本转换操作中的subtract类似只不过这里是针对K的，返回在主RDD中出现，并且不在otherRDD中出现的元素</p>
+</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="blogTitle10">3.2 Action</h3>
+<p>触发代码的运行，我们一段spark代码里面至少需要有一个action操作。</p>
+<p><strong>常用的Action</strong>:</p>
+<div class="table-wrapper"><table style="height: 1061px; width: 930px" border="1" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td valign="top" width="260">
+<p align="center"><strong>动作</strong></p>
+</td>
+<td valign="top" width="308">
+<p align="center"><strong>含义</strong></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>reduce</strong>(<em>func</em>)</p>
+</td>
+<td valign="top" width="308">
+<p>通过func函数聚集RDD中的所有元素，这个功能必须是课交换且可并联的</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>collect</strong>()</p>
+</td>
+<td valign="top" width="308">
+<p>在驱动程序中，以数组的形式返回数据集的所有元素</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>count</strong>()</p>
+</td>
+<td valign="top" width="308">
+<p>返回RDD的元素个数</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>first</strong>()</p>
+</td>
+<td valign="top" width="308">
+<p>返回RDD的第一个元素（类似于take(1)）</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>take</strong>(<em>n</em>)</p>
+</td>
+<td valign="top" width="308">
+<p>返回一个由数据集的前n个元素组成的数组</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>takeSample</strong>(<em>withReplacement</em>,<em>num</em>, [<em>seed</em>])</p>
+</td>
+<td valign="top" width="308">
+<p>返回一个数组，该数组由从数据集中随机采样的num个元素组成，可以选择是否用随机数替换不足的部分，seed用于指定随机数生成器种子</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>takeOrdered</strong>(<em>n</em>,&nbsp;<em>[ordering]</em>)</p>
+</td>
+<td valign="top" width="308">
+<p><span><span>使用自然顺序或自定义比较器</span><span>返回</span><span>RDD&nbsp;</span><span>的前</span></span><em><span><span>n个</span></span></em><span><span>元素。</span></span></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>saveAsTextFile</strong>(<em>path</em>)</p>
+</td>
+<td valign="top" width="308">
+<p>将数据集的元素以textfile的形式保存到HDFS文件系统或者其他支持的文件系统，对于每个元素，Spark将会调用toString方法，将它装换为文件中的文本</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>saveAsSequenceFile</strong>(<em>path</em>)&nbsp;</p>
+</td>
+<td valign="top" width="308">
+<p>将数据集中的元素以Hadoop sequencefile的格式保存到指定的目录下，可以使HDFS或者其他Hadoop支持的文件系统。</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>saveAsObjectFile</strong>(<em>path</em>)&nbsp;</p>
+</td>
+<td valign="top" width="308">
+<p><span><span>使用Java序列化以简单格式编写数据集的元素，然后可以使用Java序列化加载</span></span><code>SparkContext.objectFile()</code><span><span>。</span></span>&nbsp;</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>countByKey</strong>()</p>
+</td>
+<td valign="top" width="308">
+<p>针对(K,V)类型的RDD，返回一个(K,Int)的map，表示每一个key对应的元素个数。</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>foreach</strong>(<em>func</em>)</p>
+</td>
+<td valign="top" width="308">
+<p>在数据集的每一个元素上，运行函数func进行更新。</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>aggregate</strong></p>
+</td>
+<td valign="top" width="308">
+<p>先对分区进行操作，在总体操作</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>reduceByKeyLocally</strong></p>
+</td>
+<td valign="top" width="308">
+<p>&nbsp;</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>lookup</strong></p>
+</td>
+<td valign="top" width="308">
+<p>&nbsp;</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>top</strong></p>
+</td>
+<td valign="top" width="308">
+<p>&nbsp;</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>fold</strong></p>
+</td>
+<td valign="top" width="308">
+<p>&nbsp;</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="260">
+<p><strong>foreachPartition</strong></p>
+</td>
+<td valign="top" width="308">
+<p>&nbsp;</p>
+</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="blogTitle11">3.3 WordCount代码编写</h3>
+<p>使用maven进行项目构建</p>
+<h4>&nbsp;（1）使用scala进行编写</h4>
+<p>查看官方网站，需要导入2个依赖包</p>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180421144526496-1152731884.png" alt="" width="1200" class="medium-zoom-image"></p>
+<p>详细代码</p>
+<p>SparkWordCountWithScala.scala</p>
+<div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div>
+<pre>import org.apache.spark.rdd.RDD
+import org.apache.spark.{SparkConf, SparkContext}
+
+object SparkWordCountWithScala {
+  def main(args: Array[String]): Unit = {
+
+    val conf = new SparkConf()
+    /**
+      * 如果这个参数不设置，默认认为你运行的是集群模式
+      * 如果设置成local代表运行的是local模式
+      */
+    conf.setMaster("local")
+    //设置任务名
+    conf.setAppName("WordCount")
+    //创建SparkCore的程序入口
+    val sc = new SparkContext(conf)
+    //读取文件 生成RDD
+    val file: RDD[String] = sc.textFile("E:\\hello.txt")
+    //把每一行数据按照，分割
+    val word: RDD[String] = file.flatMap(_.split(","))
+    //让每一个单词都出现一次
+    val wordOne: RDD[(String, Int)] = word.map((_,1))
+    //单词计数
+    val wordCount: RDD[(String, Int)] = wordOne.reduceByKey(_+_)
+    //按照单词出现的次数 降序排序
+    val sortRdd: RDD[(String, Int)] = wordCount.sortBy(tuple =&gt; tuple._2,false)
+    //将最终的结果进行保存
+    sortRdd.saveAsTextFile("E:\\result")
+    sc.stop()
+  }</pre>
+<div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div></div>
+<p>运行结果</p>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180421151823241-1753369845.png" alt=""></p>
+<h4>（2）使用java jdk7进行编写</h4>
+<p>SparkWordCountWithJava7.java</p>
+<div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div>
+<pre>import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.FlatMapFunction;
+import org.apache.spark.api.java.function.Function2;
+import org.apache.spark.api.java.function.PairFunction;
+import scala.Tuple2;
+import java.util.Arrays;
+import java.util.Iterator;
+
+public class SparkWordCountWithJava7 {
+    public static void main(String[] args) {<br>
+        SparkConf conf = new SparkConf();
+        conf.setMaster("local");
+        conf.setAppName("WordCount");
+        JavaSparkContext sc = new JavaSparkContext(conf);
+        JavaRDD&lt;String&gt; fileRdd = sc.textFile("E:\\hello.txt");
+
+        JavaRDD&lt;String&gt; wordRDD = fileRdd.flatMap(new FlatMapFunction&lt;String, String&gt;() {
+            @Override
+            public Iterator&lt;String&gt; call(String line) throws Exception {
+                return Arrays.asList(line.split(",")).iterator();
+            }
+        });
+
+        JavaPairRDD&lt;String, Integer&gt; wordOneRDD = wordRDD.mapToPair(new PairFunction&lt;String, String, Integer&gt;() {
+            @Override
+            public Tuple2&lt;String, Integer&gt; call(String word) throws Exception {
+                return new Tuple2&lt;&gt;(word, 1);
+            }
+        });
+
+        JavaPairRDD&lt;String, Integer&gt; wordCountRDD = wordOneRDD.reduceByKey(new Function2&lt;Integer, Integer, Integer&gt;() {
+            @Override
+            public Integer call(Integer i1, Integer i2) throws Exception {
+                return i1 + i2;
+            }
+        });
+
+        JavaPairRDD&lt;Integer, String&gt; count2WordRDD = wordCountRDD.mapToPair(new PairFunction&lt;Tuple2&lt;String, Integer&gt;, Integer, String&gt;() {
+            @Override
+            public Tuple2&lt;Integer, String&gt; call(Tuple2&lt;String, Integer&gt; tuple) throws Exception {
+                return new Tuple2&lt;&gt;(tuple._2, tuple._1);
+            }
+        });
+
+        JavaPairRDD&lt;Integer, String&gt; sortRDD = count2WordRDD.sortByKey(false);
+
+        JavaPairRDD&lt;String, Integer&gt; resultRDD = sortRDD.mapToPair(new PairFunction&lt;Tuple2&lt;Integer, String&gt;, String, Integer&gt;() {
+            @Override
+            public Tuple2&lt;String, Integer&gt; call(Tuple2&lt;Integer, String&gt; tuple) throws Exception {
+                return new Tuple2&lt;&gt;(tuple._2, tuple._1);
+            }
+        });
+
+        resultRDD.saveAsTextFile("E:\\result7");
+
+    }
+}</pre>
+<div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div></div>
+<h4>&nbsp;（3）使用java jdk8进行编写</h4>
+<p>lambda表达式</p>
+<p>SparkWordCountWithJava8.java</p>
+<div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div>
+<pre>import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
+import scala.Tuple2;
+import java.util.Arrays;
+
+public class SparkWordCountWithJava8 {
+    public static void main(String[] args) {<br>
+        SparkConf conf = new SparkConf();
+        conf.setAppName("WortCount");
+        conf.setMaster("local");
+        JavaSparkContext sc = new JavaSparkContext(conf);
+
+        JavaRDD&lt;String&gt; fileRDD = sc.textFile("E:\\hello.txt");
+        JavaRDD&lt;String&gt; wordRdd = fileRDD.flatMap(line -&gt; Arrays.asList(line.split(",")).iterator());
+        JavaPairRDD&lt;String, Integer&gt; wordOneRDD = wordRdd.mapToPair(word -&gt; new Tuple2&lt;&gt;(word, 1));
+        JavaPairRDD&lt;String, Integer&gt; wordCountRDD = wordOneRDD.reduceByKey((x, y) -&gt; x + y);
+        JavaPairRDD&lt;Integer, String&gt; count2WordRDD = wordCountRDD.mapToPair(tuple -&gt; new Tuple2&lt;&gt;(tuple._2, tuple._1));
+        JavaPairRDD&lt;Integer, String&gt; sortRDD = count2WordRDD.sortByKey(false);
+        JavaPairRDD&lt;String, Integer&gt; resultRDD = sortRDD.mapToPair(tuple -&gt; new Tuple2&lt;&gt;(tuple._2, tuple._1));
+        resultRDD.saveAsTextFile("E:\\result8");
+
+    }</pre>
+<div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div></div>
+<h3 id="blogTitle12">3.4 WordCount执行过程图</h3>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180425153140543-8294264.png" alt="" width="1200" class="medium-zoom-image"></p>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180425153515149-1269337605.png" alt="" width="1200" class="medium-zoom-image"></p>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180425153556469-238789142.png" alt="" class="medium-zoom-image"></p>
+<h2 id="blogTitle13">四、RDD的宽依赖和窄依赖</h2>
+<h3 id="blogTitle14">4.1&nbsp;<strong>RDD依赖关系的本质内幕</strong></h3>
+<p>由于RDD是粗粒度的操作数据集，每个Transformation操作都会生成一个新的RDD，所以RDD之间就会形成类似流水线的前后依赖关系；RDD和它依赖的父RDD（s）的关系有两种不同的类型，即窄依赖（narrow dependency）和宽依赖（wide dependency）。如图所示显示了RDD之间的依赖关系。</p>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180425151022105-1121308065.png" alt=""></p>
+<p align="left">从图中可知：</p>
+<p align="left"><strong>窄依赖：</strong>是指每个父RDD的一个Partition最多被子RDD的一个Partition所使用，例如map、filter、union等操作都会产生窄依赖；（独生子女）</p>
+<p align="left"><strong>宽依赖：</strong>是指一个父RDD的Partition会被多个子RDD的Partition所使用，例如groupByKey、reduceByKey、sortByKey等操作都会产生宽依赖；（超生）</p>
+<p align="left">需要特别说明的是对join操作有两种情况：</p>
+<p align="left">（1）图中左半部分join：如果两个RDD在进行join操作时，一个RDD的partition仅仅和另一个RDD中已知个数的Partition进行join，那么这种类型的join操作就是窄依赖，例如图1中左半部分的join操作(join with inputs co-partitioned)；</p>
+<p align="left">（2）图中右半部分join：其它情况的join操作就是宽依赖,例如图1中右半部分的join操作(join with inputs not co-partitioned)，由于是需要父RDD的所有partition进行join的转换，这就涉及到了shuffle，因此这种类型的join操作也是宽依赖。</p>
+<p align="left">总结：</p>
+<blockquote>
+<p align="left">在这里我们是从父RDD的partition被使用的个数来定义窄依赖和宽依赖，因此可以用一句话概括下：如果父RDD的一个Partition被子RDD的一个Partition所使用就是窄依赖，否则的话就是宽依赖。因为是确定的partition数量的依赖关系，所以RDD之间的依赖关系就是窄依赖；由此我们可以得出一个推论：即窄依赖不仅包含一对一的窄依赖，还包含一对固定个数的窄依赖。</p>
+<p align="left">一对固定个数的窄依赖的理解：即子RDD的partition对父RDD依赖的Partition的数量不会随着RDD数据规模的改变而改变；换句话说，无论是有100T的数据量还是1P的数据量，在窄依赖中，子RDD所依赖的父RDD的partition的个数是确定的，而宽依赖是shuffle级别的，数据量越大，那么子RDD所依赖的父RDD的个数就越多，从而子RDD所依赖的父RDD的partition的个数也会变得越来越多。</p>
+</blockquote>
+<h3 align="left" id="blogTitle15">4.2&nbsp;<strong>依赖关系下的数据流视图</strong></h3>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180425151747136-185909749.png" alt=""></p>
+<p align="left">在spark中，会根据RDD之间的依赖关系将DAG图（有向无环图）划分为不同的阶段，对于窄依赖，由于partition依赖关系的确定性，partition的转换处理就可以在同一个线程里完成，窄依赖就被spark划分到同一个stage中，而对于宽依赖，只能等父RDD shuffle处理完成后，下一个stage才能开始接下来的计算。</p>
+<p align="left"><strong>因此spark划分stage的整体思路是</strong>：从后往前推，遇到宽依赖就断开，划分为一个stage；遇到窄依赖就将这个RDD加入该stage中。因此在图2中RDD C,RDD D,RDD E,RDDF被构建在一个stage中,RDD A被构建在一个单独的Stage中,而RDD B和RDD G又被构建在同一个stage中。</p>
+<p align="left">在spark中，Task的类型分为2种：<strong>ShuffleMapTask</strong>和<strong>ResultTask</strong>；</p>
+<p align="left">简单来说，DAG的最后一个阶段会为每个结果的partition生成一个ResultTask，即每个Stage里面的Task的数量是由该Stage中最后一个RDD的Partition的数量所决定的！而其余所有阶段都会生成ShuffleMapTask；之所以称之为ShuffleMapTask是因为它需要将自己的计算结果通过shuffle到下一个stage中；也就是说上图中的stage1和stage2相当于mapreduce中的Mapper,而ResultTask所代表的stage3就相当于mapreduce中的reducer。</p>
+<p align="left">在之前动手操作了一个wordcount程序，因此可知，Hadoop中MapReduce操作中的Mapper和Reducer在spark中的基本等量算子是map和reduceByKey;不过区别在于：Hadoop中的MapReduce天生就是排序的；而reduceByKey只是根据Key进行reduce，但spark除了这两个算子还有其他的算子；因此从这个意义上来说，Spark比Hadoop的计算算子更为丰富。</p>
+<h2 id="blogTitle16">五、广播变量与累加器</h2>
+<p>在spark程序中，当一个传递给Spark操作(例如map和reduce)的函数在远程节点上面运行时，Spark操作实际上操作的是这个函数所用变量的一个独立副本。这些变量会被复制到每台机器上，并且这些变量在远程机器上的所有更新都不会传递回驱动程序。通常跨任务的读写变量是低效的，但是，Spark还是为两种常见的使用模式提供了两种有限的共享变量：广播变量（broadcast variable）和累加器（accumulator）</p>
+<h2 id="blogTitle17">六、广播变量broadcast variable</h2>
+<h3 id="blogTitle18">6.1 广播变量的意义</h3>
+<p>如果我们要在分布式计算里面分发大对象，例如：字典，集合，黑白名单等，这个都会由Driver端进行分发，一般来讲，如果这个变量不是广播变量，那么每个task就会分发一份，这在<strong>task数目十分多的情况下Driver的带宽会成为系统的瓶颈，而且会大量消耗task服务器上的资源</strong>，如果将这个变量声明为广播变量，那么只是每个executor拥有一份，这个executor启动的task会共享这个变量，节省了通信的成本和服务器的资源。</p>
+<h3 id="blogTitle19">6.2 广播变量图解</h3>
+<p>错误的，不使用广播变量</p>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180421162057226-1988253385.png" alt="" class="medium-zoom-image"></p>
+<p>正确的，使用广播变量的情况</p>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180421162148572-1992224700.png" alt="" class="medium-zoom-image"></p>
+<h3 id="blogTitle20">6.3 如何定义一个广播变量</h3>
+<div class="cnblogs_code">
+<pre>val a = 3
+val broadcast = sc.broadcast(a)</pre>
+</div>
+<h3 id="blogTitle21">6.4如何还原一个广播变量</h3>
+<div class="cnblogs_code">
+<pre>val c = broadcast.value</pre>
+</div>
+<h3 class="15" id="blogTitle22"><strong>6.5 广播变量使用</strong></h3>
+<div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div>
+<pre>val conf = new<span> SparkConf()
+conf.setMaster("local").setAppName("brocast"<span>)
+val sc = new<span> SparkContext(conf)
+val list = List("hello hadoop"<span>)
+val broadCast =<span> sc.broadcast(list)
+val lineRDD = sc.textFile("./words.txt"<span>)
+lineRDD.filter { x =&gt; broadCast.value.contains(x) }.foreach<span> { println}
+sc.stop()</span></span></span></span></span></span></span></pre>
+<div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div></div>
+<h3 id="blogTitle23">6.6 定义广播变量注意点&nbsp;</h3>
+<p>变量一旦被定义为一个广播变量，那么这个变量只能读，不能修改</p>
+<h3 id="blogTitle24">6.7&nbsp;<strong>注意事项</strong></h3>
+<p class="15">1、能不能将一个RDD使用广播变量广播出去？</p>
+<p class="15">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 不能，因为RDD是不存储数据的。<strong>可以将RDD的结果广播出去。</strong></p>
+<p class="15">2、&nbsp;广播变量只能在Driver端定义，<strong>不能在Executor端定义。</strong></p>
+<p class="15">3、&nbsp;在Driver端可以修改广播变量的值，<strong>在Executor端无法修改广播变量的值。</strong></p>
+<p class="15">4、如果executor端用到了Driver的变量，如果<strong>不使用广播变量在Executor有多少task就有多少Driver端的变量副本。</strong></p>
+<p class="15">5、如果Executor端用到了Driver的变量，如果<strong>使用广播变量在每个Executor中只有一份Driver端的变量副本。</strong></p>
+<h2 id="blogTitle25">七、累加器&nbsp;</h2>
+<h3 id="blogTitle26">7.1 累加器的意义</h3>
+<p>在spark应用程序中，我们经常会有这样的需求，如异常监控，调试，记录符合某特性的数据的数目，这种需求都需要用到计数器，如果一个变量不被声明为一个累加器，那么它将在被改变时不会再driver端进行全局汇总，即在分布式运行时每个task运行的只是原始变量的一个副本，并不能改变原始变量的值，但是当这个变量被声明为累加器后，该变量就会有分布式计数的功能。</p>
+<h3 id="blogTitle27">7.2 图解累加器</h3>
+<p>错误的图解</p>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180421164701390-9845184.png" alt="" class="medium-zoom-image"></p>
+<p>正确的图解</p>
+<p><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/1228818-20180421165419534-240211041.png" alt="" class="medium-zoom-image"></p>
+<h3 id="blogTitle28">7.3 如何定义一个累加器&nbsp;</h3>
+<div class="cnblogs_code">
+<pre>val a = sc.accumulator(0)</pre>
+</div>
+<h3 id="blogTitle29">7.4 如何还原一个累加器&nbsp;</h3>
+<div class="cnblogs_code">
+<pre>val b = a.value</pre>
+</div>
+<h3 id="blogTitle30">7.5 累加器的使用</h3>
+<div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div>
+<pre>val conf = new<span> SparkConf()
+conf.setMaster("local").setAppName("accumulator"<span>)
+val sc = new<span> SparkContext(conf)
+val accumulator = sc.accumulator(0<span>)
+sc.textFile("./words.txt").foreach { x =&gt;{accumulator.add(1<span>)}}
+println(accumulator.value)
+sc.stop()</span></span></span></span></span></pre>
+<div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/copycode.gif" alt="复制代码"></a></span></div></div>
+<h3 id="blogTitle31">7.6&nbsp;<strong>注意事项</strong></h3>
+<p>1、&nbsp;<strong>累加器在Driver端定义赋初始值，累加器只能在Driver端读取最后的值，在Excutor端更新。</strong></p>
+<p>2、累加器不是一个调优的操作，因为如果不这样做，结果是错的</p>
+</div>
+<div id="MySignature"></div>
+<div class="clear"></div>
+<div id="blog_post_info_block"><div id="BlogPostCategory">
+    分类: 
+            <a href="https://www.cnblogs.com/frankdeng/category/1206144.html" target="_blank">Spark</a></div>
+<div id="EntryTag">
+    标签: 
+            <a href="https://www.cnblogs.com/frankdeng/tag/Spark/">Spark</a></div>
+
+    <div id="blog_post_info">
+<div id="green_channel">
+        <a href="javascript:void(0);" id="green_channel_digg" onclick="DiggIt(9301653,cb_blogId,1);green_channel_success(this,&#39;谢谢推荐！&#39;);">好文要顶</a>
+        <a id="green_channel_follow" onclick="follow(&#39;238792d9-f4d4-4d4d-d3b3-08d5a91b4f51&#39;);" href="javascript:void(0);">关注我</a>
+    <a id="green_channel_favorite" onclick="AddToWz(cb_entryId);return false;" href="javascript:void(0);">收藏该文</a>
+    <a id="green_channel_weibo" href="javascript:void(0);" title="分享至新浪微博" onclick="ShareToTsina()"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/icon_weibo_24.png" alt=""></a>
+    <a id="green_channel_wechat" href="javascript:void(0);" title="分享至微信" onclick="shareOnWechat()"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/wechat.png" alt=""></a>
+</div>
+<div id="author_profile">
+    <div id="author_profile_info" class="author_profile_info">
+            <a href="https://home.cnblogs.com/u/frankdeng/" target="_blank"><img src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/20180509232100.png" class="author_avatar" alt=""></a>
+        <div id="author_profile_detail" class="author_profile_info">
+            <a href="https://home.cnblogs.com/u/frankdeng/">Frankdeng</a><br>
+            <a href="https://home.cnblogs.com/u/frankdeng/followees/">关注 - 42</a><br>
+            <a href="https://home.cnblogs.com/u/frankdeng/followers/">粉丝 - 381</a>
+        </div>
+    </div>
+    <div class="clear"></div>
+    <div id="author_profile_honor"></div>
+    <div id="author_profile_follow">
+                <a href="javascript:void(0);" onclick="follow(&#39;238792d9-f4d4-4d4d-d3b3-08d5a91b4f51&#39;);return false;">+加关注</a>
+    </div>
+</div>
+<div id="div_digg">
+    <div class="diggit" onclick="votePost(9301653,&#39;Digg&#39;)">
+        <span class="diggnum" id="digg_count">4</span>
+    </div>
+    <div class="buryit" onclick="votePost(9301653,&#39;Bury&#39;)">
+        <span class="burynum" id="bury_count">0</span>
+    </div>
+    <div class="clear"></div>
+    <div class="diggword" id="digg_tips">
+    </div>
+</div>
+
+<script type="text/javascript">
+    currentDiggType = 0;
+</script></div>
+    <div class="clear"></div>
+    <div id="post_next_prev">
+
+    <a href="https://www.cnblogs.com/frankdeng/p/9294812.html" class="p_n_p_prefix">« </a> 上一篇：    <a href="https://www.cnblogs.com/frankdeng/p/9294812.html" title="发布于 2018-07-12 19:52">Spark（二）CentOS7.5搭建Spark2.3.1分布式集群</a>
+    <br>
+    <a href="https://www.cnblogs.com/frankdeng/p/9301672.html" class="p_n_p_prefix">» </a> 下一篇：    <a href="https://www.cnblogs.com/frankdeng/p/9301672.html" title="发布于 2018-07-14 00:16">Spark（四）Spark之Transformation和Action</a>
+
+</div>
+</div>
+            </div>
+            <div class="postDesc">posted @ 
+<span id="post-date">2018-07-13 22:37</span>&nbsp;
+<a href="https://www.cnblogs.com/frankdeng/">Frankdeng</a>&nbsp;
+阅读(<span id="post_view_count">9392</span>)&nbsp;
+评论(<span id="post_comment_count">1</span>)&nbsp;
+<a href="https://i.cnblogs.com/EditPosts.aspx?postid=9301653" rel="nofollow">编辑</a>&nbsp;
+<a href="javascript:void(0)" onclick="AddToWz(9301653);return false;">收藏</a>&nbsp;
+<a href="javascript:void(0)" onclick="reportManager.report({ currentUserId: &#39;&#39;, targetType: &#39;blogPost&#39;, targetId: &#39;9301653&#39;, targetLink: &#39;https://www.cnblogs.com/frankdeng/p/9301653.html&#39;, title: &#39;Spark（三）RDD与广播变量、累加器&#39; })">举报</a></div>
+        </div>
+	    
+	    
+    </div><!--end: topics 文章、评论容器-->
+</div>
+<script src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/highlight.min.js.下载"></script>
+<script>markdown_highlight();</script>
+<script>
+    var allowComments = true, cb_blogId = 428549, cb_blogApp = 'frankdeng', cb_blogUserGuid = '238792d9-f4d4-4d4d-d3b3-08d5a91b4f51';
+    var cb_entryId = 9301653, cb_entryCreatedDate = '2018-07-13 22:37', cb_postType = 1;
+    updatePostStats(
+        [cb_entryId],
+        function(id, count) { $("#post_view_count").text(count) },
+        function(id, count) { $("#post_comment_count").text(count) })
+    zoomManager.apply("#cnblogs_post_body img:not(.code_img_closed):not(.code_img_opened)");
+</script>
+<a name="!comments"></a>
+<div id="blog-comments-placeholder"></div>
+<div id="comment_form" class="commentform">
+    <a name="commentform"></a>
+    <div id="divCommentShow"></div>
+    <div id="comment_nav"><span id="span_refresh_tips"></span><a href="javascript:void(0);" onclick="return RefreshCommentList();" id="lnk_RefreshComments" runat="server" clientidmode="Static">刷新评论</a><a href="https://www.cnblogs.com/frankdeng/p/9301653.html#" onclick="return RefreshPage();">刷新页面</a><a href="https://www.cnblogs.com/frankdeng/p/9301653.html#top">返回顶部</a></div>
+    <div id="comment_form_container" style="visibility: visible;"><div class="login_tips">
+    登录后才能查看或发表评论，立即 <a rel="nofollow" href="javascript:void(0);" class="underline" onclick="return account.login(&#39;!comments&#39;);">登录</a> 或者
+    <a href="https://www.cnblogs.com/">逛逛</a> 博客园首页
+</div>
+</div>
+    <div class="ad_text_commentbox" id="ad_text_under_commentbox"></div>
+    <div id="ad_t2"><a href="https://developer.aliyun.com/topic/n2021?channel=yy_developer?utm_content=g_1000278324" target="_blank" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;T2-阿里云-研发效能峰会&#39;)">【推荐】因云而生，生而敏捷：2021阿里巴巴研发效能峰会，邀你共享效能盛宴</a><br><a href="https://cloud.baidu.com/campaign/2021mid/index.html?track=cp:bokeyuan|pf:pc|pp:bokeyuan-huodong-21nianzhongdacu-neiyewenzilian|pu:21nianzhongdacu-neiyewenzilian|ci:21nzdc|kw:10225193" target="_blank" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;T2-百度智能云&#39;)">【推荐】百度智能云618年中大促，限时抢购，新老用户同享超值折扣</a><br><a href="http://www.uccpsoft.com/index.htm" target="_blank" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;T2-ucancode&#39;)">【推荐】大型组态、工控、仿真、CAD\GIS 50万行VC++源码免费下载!</a><br><a href="https://brands.cnblogs.com/huawei" target="_blank" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;T2-华为专区&#39;)">【推荐】618好物推荐：基于HarmonyOS和小熊派BearPi-HM Nano的护花使者</a><br><a href="https://www.aliyun.com/activity/daily/bestoffer?userCode=swh7dvlt" target="_blank" onclick="ga(&#39;send&#39;, &#39;event&#39;, &#39;Link&#39;, &#39;click&#39;, &#39;T2-阿里云-cps&#39;)">【推荐】阿里云爆品销量榜单出炉，精选爆款产品低至0.55折</a><br></div>
+    <div id="opt_under_post"></div>
+    <div id="cnblogs_c1" class="under-post-card">
+        <div id="div-gpt-ad-1592365906576-0" style="width: 300px; height: 250px;" data-google-query-id="CJiY2dPhrPECFUPOvQodLXoDyA"><div id="google_ads_iframe_/1090369/C1_0__container__" style="border: 0pt none;"><iframe id="google_ads_iframe_/1090369/C1_0" title="3rd party ad content" name="google_ads_iframe_/1090369/C1_0" width="300" height="250" scrolling="no" marginwidth="0" marginheight="0" frameborder="0" allow="conversion-measurement" data-google-container-id="1" style="border: 0px; vertical-align: bottom;" data-load-complete="true" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/saved_resource.html"></iframe></div></div>
+    </div>
+    <div id="under_post_card1"><div class="under-post-card">
+<b>编辑推荐：</b>
+<br>
+
+· <a href="https://www.cnblogs.com/yexiaochai/p/14915151.html" target="_blank">技术管理进阶 —— 技术总监的第一要务</a>
+    <br>
+· <a href="https://www.cnblogs.com/strick/p/14422539.html" target="_blank">带团队后的日常（二）</a>
+    <br>
+· <a href="https://www.cnblogs.com/ihardcoder/p/14892276.html" target="_blank">WebGIS vs WebGL 图形编程</a>
+    <br>
+· <a href="https://www.cnblogs.com/kklldog/p/netcore-with-microservices-04.html" target="_blank">.Net Core with 微服务 - Consul 注册中心</a>
+    <br>
+· <a href="https://www.cnblogs.com/jackyfei/p/14899432.html" target="_blank">为什么选择 ASP.NET Core</a>
+    <br>
+</div></div>
+    <div id="cnblogs_c2" class="under-post-card">
+        <div id="div-gpt-ad-1592366332455-0" style="width: 468px; height: 60px;" data-google-query-id="CJmY2dPhrPECFUPOvQodLXoDyA"><div id="google_ads_iframe_/1090369/C2_0__container__" style="border: 0pt none;"><iframe id="google_ads_iframe_/1090369/C2_0" title="3rd party ad content" name="google_ads_iframe_/1090369/C2_0" width="468" height="60" scrolling="no" marginwidth="0" marginheight="0" frameborder="0" allow="conversion-measurement" data-google-container-id="2" style="border: 0px; vertical-align: bottom;" data-load-complete="true" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/saved_resource(1).html"></iframe></div></div>
+    </div>
+    <div id="under_post_card2"><div class="itnews under-post-card">
+    <b>最新新闻</b>：
+    <br>
+ ·          <a href="https://news.cnblogs.com/n/696561/" target="_blank">4K性能猛增200% AMD正式发布FSR游戏技术：免费下载</a>
+        <br>
+ ·          <a href="https://news.cnblogs.com/n/696560/" target="_blank">微信/抖音重磅更新：上班“摸鱼”更爽了？太天真</a>
+        <br>
+ ·          <a href="https://news.cnblogs.com/n/696559/" target="_blank">中科院院士王阳元：不解决卡脖子问题死不瞑目</a>
+        <br>
+ ·          <a href="https://news.cnblogs.com/n/696558/" target="_blank">格力分房员工有产权还是只有使用权？董明珠回应了</a>
+        <br>
+ ·          <a href="https://news.cnblogs.com/n/696557/" target="_blank">特斯拉跑通中国最长充电路线：横跨东西、全长5000公里</a>
+        <br>
+    » <a href="https://news.cnblogs.com/" title="IT 新闻" target="_blank">更多新闻...</a>
+</div></div>
+    <div id="HistoryToday" class="under-post-card"></div>
+    <script type="text/javascript">
+       var commentManager = new blogCommentManager();
+       commentManager.renderComments(0);
+       fixPostBody();
+       deliverBigBanner();
+setTimeout(function() { incrementViewCount(cb_entryId); }, 50);       deliverT2();
+       deliverC1C2();
+       loadNewsAndKb();
+       loadBlogSignature();
+LoadPostCategoriesTags(cb_blogId, cb_entryId);       LoadPostInfoBlock(cb_blogId, cb_entryId, cb_blogApp, cb_blogUserGuid);
+       GetPrevNextPost(cb_entryId, cb_blogId, cb_entryCreatedDate, cb_postType);
+       loadOptUnderPost();
+       GetHistoryToday(cb_blogId, cb_blogApp, cb_entryCreatedDate);
+    </script>
+</div>
+
+	</div><!--end: forFlow -->
+	</div><!--end: mainContent 主体内容容器-->
+	<div id="sideBar">
+		<div id="sideBarMain">
+			<div id="sidebar_news" class="newsItem"><!--done-->
+<h3 class="catListTitle">公告</h3>
+
+<div id="blog-news">
+    <!-- 爱心特效 -->
+<script type="text/javascript">window['__document_write_ajax_callbacks__']['4']();</script><script type="text/javascript">window['__document_write_ajax_callbacks__']['1']();</script>
+
+<script type="text/javascript">window['__document_write_ajax_callbacks__']['5']();</script><script>window['__document_write_ajax_callbacks__']['2']();</script>
+    <div id="profile_block">
+        昵称：
+        <a href="https://home.cnblogs.com/u/frankdeng/">
+            Frankdeng
+        </a>
+        <br>
+        园龄：
+        <a href="https://home.cnblogs.com/u/frankdeng/" title="入园时间：2018-04-24">
+            3年1个月
+        </a>
+        <br>
+        粉丝：
+        <a href="https://home.cnblogs.com/u/frankdeng/followers/">
+            381
+        </a>
+        <br>
+        关注：
+        <a href="https://home.cnblogs.com/u/frankdeng/followees/">
+            42
+        </a>
+        <div id="p_b_follow">
+<a href="javascript:void(0)" onclick="follow(&#39;238792d9-f4d4-4d4d-d3b3-08d5a91b4f51&#39;)">+加关注</a></div>
+        <script type="text/javascript">window['__document_write_ajax_callbacks__']['6']();</script><script>window['__document_write_ajax_callbacks__']['3']();</script>
+    </div>
+</div>
+
+</div>
+<div id="sidebar_c3"></div>
+			<div id="blog-calendar" style="">
+
+<table id="blogCalendar" class="Cal" cellspacing="0" cellpadding="0" title="Calendar" border="0">
+    <tbody>
+        <tr>
+            <td colspan="7">
+                <table class="CalTitle" cellspacing="0" border="0">
+                    <tbody>
+                        <tr>
+                            <td class="CalNextPrev">
+                                <a href="javascript:void(0);" onclick="loadBlogCalendar(&#39;2021/05/23&#39;); return false;">&lt;</a>
+                            </td>
+                            <td align="center">2021年6月</td>
+                            <td align="right" class="CalNextPrev">
+                                <a href="javascript:void(0);" onclick="loadBlogCalendar(&#39;2021/07/23&#39;); return false;">&gt;</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </td>
+        </tr>
+    <tr>
+        <th class="CalDayHeader" align="center" abbr="日" scope="col">日</th>
+        <th class="CalDayHeader" align="center" abbr="一" scope="col">一</th>
+        <th class="CalDayHeader" align="center" abbr="二" scope="col">二</th>
+        <th class="CalDayHeader" align="center" abbr="三" scope="col">三</th>
+        <th class="CalDayHeader" align="center" abbr="四" scope="col">四</th>
+        <th class="CalDayHeader" align="center" abbr="五" scope="col">五</th>
+        <th class="CalDayHeader" align="center" abbr="六" scope="col">六</th>
+    </tr>
+            <tr>
+                            <td class="CalOtherMonthDay" align="center">30</td>
+                            <td class="CalOtherMonthDay" align="center">31</td>
+                        <td class="" align="center">
+                            1
+                        </td>
+                        <td class="" align="center">
+                            2
+                        </td>
+                        <td class="" align="center">
+                            3
+                        </td>
+                        <td class="" align="center">
+                            4
+                        </td>
+                    <td class="CalWeekendDay" align="center">
+                        5
+                    </td>
+            </tr>
+                <tr>
+                        <td class="CalWeekendDay" align="center">
+                            6
+                        </td>
+                            <td class="" align="center">
+                                7
+                            </td>
+                            <td class="" align="center">
+                                8
+                            </td>
+                            <td class="" align="center">
+                                9
+                            </td>
+                            <td class="" align="center">
+                                10
+                            </td>
+                            <td class="" align="center">
+                                11
+                            </td>
+                        <td class="CalWeekendDay" align="center">
+                            12
+                        </td>
+                </tr>
+                <tr>
+                        <td class="CalWeekendDay" align="center">
+                            13
+                        </td>
+                            <td class="" align="center">
+                                14
+                            </td>
+                            <td class="" align="center">
+                                15
+                            </td>
+                            <td class="" align="center">
+                                16
+                            </td>
+                            <td class="" align="center">
+                                17
+                            </td>
+                            <td class="" align="center">
+                                18
+                            </td>
+                        <td class="CalWeekendDay" align="center">
+                            19
+                        </td>
+                </tr>
+                <tr>
+                        <td class="CalWeekendDay" align="center">
+                            20
+                        </td>
+                            <td class="" align="center">
+                                21
+                            </td>
+                            <td class="" align="center">
+                                22
+                            </td>
+                            <td class="CalTodayDay" align="center">
+                                23
+                            </td>
+                            <td class="" align="center">
+                                24
+                            </td>
+                            <td class="" align="center">
+                                25
+                            </td>
+                        <td class="CalWeekendDay" align="center">
+                            26
+                        </td>
+                </tr>
+                <tr>
+                        <td class="CalWeekendDay" align="center">
+                            27
+                        </td>
+                            <td class="" align="center">
+                                28
+                            </td>
+                            <td class="" align="center">
+                                29
+                            </td>
+                            <td class="" align="center">
+                                30
+                            </td>
+                            <td class="CalOtherMonthDay" align="center">
+                                1
+                            </td>
+                            <td class="CalOtherMonthDay" align="center">
+                                2
+                            </td>
+                        <td class="CalOtherMonthDay" align="center">
+                            3
+                        </td>
+                </tr>
+                <tr>
+                        <td class="CalOtherMonthDay" align="center">
+                            4
+                        </td>
+                            <td class="CalOtherMonthDay" align="center">
+                                5
+                            </td>
+                            <td class="CalOtherMonthDay" align="center">
+                                6
+                            </td>
+                            <td class="CalOtherMonthDay" align="center">
+                                7
+                            </td>
+                            <td class="CalOtherMonthDay" align="center">
+                                8
+                            </td>
+                            <td class="CalOtherMonthDay" align="center">
+                                9
+                            </td>
+                        <td class="CalOtherMonthDay" align="center">
+                            10
+                        </td>
+                </tr>
+    </tbody>
+</table></div><script>loadBlogDefaultCalendar();</script>			
+			<div id="leftcontentcontainer">
+				<div id="blog-sidecolumn"><!-- 搜索 -->
+<div id="sidebar_search" class="sidebar-block">
+    <div id="sidebar_search" class="mySearch">
+        <h3 class="catListTitle">搜索</h3>
+        <div id="sidebar_search_box">
+            <div id="widget_my_zzk" class="div_my_zzk">
+                <input type="text" id="q" onkeydown="return zzk_go_enter(event);" class="input_my_zzk">&nbsp;<input onclick="zzk_go()" type="button" value="找找看" id="btnZzk" class="btn_my_zzk">
+            </div>
+            <div id="widget_my_google" class="div_my_zzk">
+                <input type="text" name="google_q" id="google_q" onkeydown="return google_go_enter(event);" class="input_my_zzk">&nbsp;<input onclick="google_go()" type="button" value="谷歌搜索" class="btn_my_zzk">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 常用链接 -->
+<div id="sidebar_shortcut" class="sidebar-block"><div class="catListLink">
+<h3 class="catListTitle">
+常用链接
+</h3>
+<ul>
+    
+<li><a href="https://www.cnblogs.com/frankdeng/p/" title="我的博客的随笔列表">我的随笔</a></li>
+<li><a href="https://www.cnblogs.com/frankdeng/MyComments.html" title="我的发表过的评论列表">我的评论</a></li>
+<li><a href="https://www.cnblogs.com/frankdeng/OtherPosts.html" title="我评论过的随笔列表">我的参与</a></li>
+<li><a href="https://www.cnblogs.com/frankdeng/RecentComments.html" title="我的博客的评论列表">最新评论</a></li>
+<li><a href="https://www.cnblogs.com/frankdeng/tag/" title="我的博客的标签列表">我的标签</a></li>
+
+</ul>
+</div>
+
+</div>
+
+<!-- 最新随笔 -->
+
+
+<!-- 我的标签 -->
+<div id="sidebar_toptags" class="sidebar-block"><div class="catListTag">
+<h3 class="catListTitle">我的标签</h3>
+<ul>
+        <li>
+            <a href="https://www.cnblogs.com/frankdeng/tag/Spark/">Spark<span class="tag-count">(24)</span></a>
+        </li>
+        <li>
+            <a href="https://www.cnblogs.com/frankdeng/tag/Hadoop/">Hadoop<span class="tag-count">(19)</span></a>
+        </li>
+        <li>
+            <a href="https://www.cnblogs.com/frankdeng/tag/HBase/">HBase<span class="tag-count">(12)</span></a>
+        </li>
+        <li>
+            <a href="https://www.cnblogs.com/frankdeng/tag/Hive/">Hive<span class="tag-count">(12)</span></a>
+        </li>
+        <li>
+            <a href="https://www.cnblogs.com/frankdeng/tag/Kafka/">Kafka<span class="tag-count">(8)</span></a>
+        </li>
+        <li>
+            <a href="https://www.cnblogs.com/frankdeng/tag/Java/">Java<span class="tag-count">(7)</span></a>
+        </li>
+        <li>
+            <a href="https://www.cnblogs.com/frankdeng/tag/Liunx/">Liunx<span class="tag-count">(7)</span></a>
+        </li>
+        <li>
+            <a href="https://www.cnblogs.com/frankdeng/tag/Git/">Git<span class="tag-count">(5)</span></a>
+        </li>
+        <li>
+            <a href="https://www.cnblogs.com/frankdeng/tag/Solr/">Solr<span class="tag-count">(5)</span></a>
+        </li>
+        <li>
+            <a href="https://www.cnblogs.com/frankdeng/tag/Flink/">Flink<span class="tag-count">(5)</span></a>
+        </li>
+    <li>
+        <a href="https://www.cnblogs.com/frankdeng/tag/">更多</a>
+    </li>
+
+</ul>
+</div>
+
+</div>
+
+<!-- 积分与排名 -->
+
+
+<!-- 随笔分类、随笔档案、文章分类、新闻分类、相册、链接 -->
+<div id="sidebar_categories">
+
+    <div id="sidebar_postcategory" class="catListPostCategory sidebar-block">
+        <h3 class="catListTitle">
+            
+随笔分类
+
+
+
+        </h3>
+
+        <ul>
+
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1279598.html" rel="" target="">
+    ETL工具(2)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1214274.html" rel="" target="">
+    Flink(3)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1206153.html" rel="" target="">
+    Flume(2)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1206140.html" rel="" target="">
+    Hadoop(20)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1215444.html" rel="" target="">
+    HBase(12)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1206143.html" rel="" target="">
+    Hive(11)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1292100.html" rel="" target="">
+    Kafka(8)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1206144.html" rel="" target="">
+    Spark(19)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1286501.html" rel="" target="">
+    Spring(1)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1292104.html" rel="" target="">
+    Storm(4)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1214239.html" rel="" target="">
+    WEB服务(2)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1285990.html" rel="" target="">
+    编程语言(6)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1276331.html" rel="" target="">
+    查询分析(3)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1260507.html" rel="" target="">
+    前端可视化(3)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1215445.html" rel="" target="">
+    任务调度(3)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="false" style="display: none">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1284928.html" rel="" target="">
+    数据仓库(1)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="false" style="display: none">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1215440.html" rel="" target="">
+    数据库(7)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="false" style="display: none">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1206151.html" rel="" target="">
+    搜索ELK(5)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="false" style="display: none">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1206141.html" rel="" target="">
+    系统运维(10)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="false" style="display: none">
+                    
+<a href="https://www.cnblogs.com/frankdeng/category/1291135.html" rel="" target="">
+    项目管理(6)
+</a>
+ 
+
+                </li>                
+            <li>
+                <a href="javascript:void(0)" onclick="sideColumnManager.loadMore(this)">更多</a>
+            </li>
+        </ul>
+
+
+    </div>    
+    <div id="sidebar_postarchive" class="catListPostArchive sidebar-block">
+        <h3 class="catListTitle">
+            
+随笔档案
+
+
+
+        </h3>
+
+        <ul>
+
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/archive/2018/12.html" rel="" target="">
+    2018年12月(3)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/archive/2018/11.html" rel="" target="">
+    2018年11月(2)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/archive/2018/10.html" rel="" target="">
+    2018年10月(3)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/archive/2018/09.html" rel="" target="">
+    2018年9月(18)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/archive/2018/08.html" rel="" target="">
+    2018年8月(21)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/archive/2018/07.html" rel="" target="">
+    2018年7月(24)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/archive/2018/06.html" rel="" target="">
+    2018年6月(28)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/archive/2018/05.html" rel="" target="">
+    2018年5月(20)
+</a>
+ 
+
+                </li>                
+                <li data-category-list-item-visible="true" style="display: block">
+                    
+<a href="https://www.cnblogs.com/frankdeng/archive/2018/04.html" rel="" target="">
+    2018年4月(6)
+</a>
+ 
+
+                </li>                
+            
+        </ul>
+
+
+    </div>    
+</div>
+
+<!-- 最新评论 -->
+<div id="sidebar_recentcomments" class="sidebar-block"><div class="catListComment">
+<h3 class="catListTitle">最新评论</h3>
+
+	<div class="RecentCommentBlock">
+        <ul>
+                    <li class="recent_comment_title"><a href="https://www.cnblogs.com/frankdeng/p/9027037.html">1. Re:Linux之CentOS7.5安装及克隆</a></li>
+                    <li class="recent_comment_body"><p>太全面啦！为了你特地注册了博客园~ 盆友有CSDN吗<sub>可以关注你吗</sub></p>
+</li>
+                    <li class="recent_comment_author">--海大富鸭</li>
+                    <li class="recent_comment_title"><a href="https://www.cnblogs.com/frankdeng/p/9310191.html">2. Re:HBase（二）CentOS7.5搭建HBase1.2.6HA集群</a></li>
+                    <li class="recent_comment_body"><h2 id="section">写的太好了！！！</h2>
+</li>
+                    <li class="recent_comment_author">--GTboy</li>
+                    <li class="recent_comment_title"><a href="https://www.cnblogs.com/frankdeng/p/9310278.html">3. Re:HBase（三）HBase架构与工作原理</a></li>
+                    <li class="recent_comment_body"><p>不是说0.98版本以后，一个regionserver可以有多个Hlog吗？</p>
+</li>
+                    <li class="recent_comment_author">--买辣椒也用券e</li>
+                    <li class="recent_comment_title"><a href="https://www.cnblogs.com/frankdeng/p/9400622.html">4. Re:Flink（一）Flink的入门简介</a></li>
+                    <li class="recent_comment_body">@大鸟说说 因为是csdn上的啊...</li>
+                    <li class="recent_comment_author">--shian</li>
+                    <li class="recent_comment_title"><a href="https://www.cnblogs.com/frankdeng/p/9760015.html">5. Re:Flink（三）Flink开发IDEA环境搭建与测试</a></li>
+                    <li class="recent_comment_body"><p>你好，我的flink安装在centos服务器上，然后我在本地Windows的idea进行开发，执行程序时就报错是怎么回事呢？看你这里，好像可以直接在idea运行啊？</p>
+</li>
+                    <li class="recent_comment_author">--Try_It</li>
+        </ul>
+    </div>
+</div>
+
+</div>
+
+
+<!-- 阅读排行榜 -->
+<div id="sidebar_topviewedposts" class="sidebar-block"><div class="catListView">
+<h3 class="catListTitle">阅读排行榜</h3>
+	<div id="TopViewPostsBlock">
+        <ul style="word-break:break-all">
+                    <li>
+                        <a href="https://www.cnblogs.com/frankdeng/p/9452982.html">
+                            1. kafka可视化客户端工具（Kafka Tool）的基本使用(131077)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.cnblogs.com/frankdeng/p/9400622.html">
+                            2. Flink（一）Flink的入门简介(116979)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.cnblogs.com/frankdeng/p/9584870.html">
+                            3. Kafka集群管理工具kafka-manager的安装使用(80257)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.cnblogs.com/frankdeng/p/9027037.html">
+                            4. Linux之CentOS7.5安装及克隆(48797)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.cnblogs.com/frankdeng/p/9760015.html">
+                            5. Flink（三）Flink开发IDEA环境搭建与测试(42464)
+                        </a>
+                    </li>
+        </ul>
+    </div>
+</div>
+
+</div>
+
+<!-- 评论排行榜 -->
+<div id="sidebar_topcommentedposts" class="sidebar-block"><div class="catListFeedback">
+<h3 class="catListTitle">评论排行榜</h3>
+	<div id="TopFeedbackPostsBlock">
+        <ul style="word-break:break-all">
+                    <li>
+                        <a href="https://www.cnblogs.com/frankdeng/p/9452982.html">
+                            1. kafka可视化客户端工具（Kafka Tool）的基本使用(12)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.cnblogs.com/frankdeng/p/9047698.html">
+                            2. Hadoop（二）CentOS7.5搭建Hadoop2.7.6完全分布式集群(9)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.cnblogs.com/frankdeng/p/9760015.html">
+                            3. Flink（三）Flink开发IDEA环境搭建与测试(5)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.cnblogs.com/frankdeng/p/9400622.html">
+                            4. Flink（一）Flink的入门简介(5)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://www.cnblogs.com/frankdeng/p/9400627.html">
+                            5. Flink（二）CentOS7.5搭建Flink1.6.1分布式集群(4)
+                        </a>
+                    </li>
+        </ul>
+    </div>
+</div>
+
+</div>
+
+<!-- 推荐排行榜 -->
+<div id="sidebar_topdiggedposts" class="sidebar-block">
+<div id="topdigg_posts_wrap">
+    <div class="catListView">
+        <h3 class="catListTitle">推荐排行榜</h3>
+        <div id="TopDiggPostsBlock">
+            <ul style="word-break: break-all">
+                        <li>
+                            <a href="https://www.cnblogs.com/frankdeng/p/9310684.html">
+                                1. Kafka（一）Kafka的简介与架构(8)
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://www.cnblogs.com/frankdeng/p/9463897.html">
+                                2. Hive（十）Hive性能调优总结(7)
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://www.cnblogs.com/frankdeng/p/9019462.html">
+                                3. IDEA2018.1安装配置文档(6)
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://www.cnblogs.com/frankdeng/p/9452982.html">
+                                4. kafka可视化客户端工具（Kafka Tool）的基本使用(4)
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://www.cnblogs.com/frankdeng/p/9301485.html">
+                                5. Spark（五）Spark任务提交方式和执行流程(4)
+                            </a>
+                        </li>
+            </ul>
+        </div>
+    </div>
+</div></div></div>
+                    <script>loadBlogSideColumn();</script>
+			</div>			
+		</div><!--end: sideBarMain -->
+	</div><!--end: sideBar 侧边栏容器 -->
+	<div class="clear"></div>
+	</div><!--end: main -->
+	<div class="clear"></div>
+	<div id="footer">
+		<!--done-->
+Copyright © 2021 Frankdeng
+<br><span id="poweredby">Powered by .NET 5.0 on Kubernetes</span>
+
+
+
+	</div><!--end: footer -->
+</div><!--end: home 自定义的最大容器 -->
+
+
+    
+
+    <input type="hidden" id="antiforgery_token" value="CfDJ8L-rpLgFVEJMgssCVvNUAjtFBh1xJwBskn-sIUnT4dgohmWUJXHh6bW_97J060tDNqwHpkUz8FVbCZAV2J6oI7AB34vSfd4J0_XSIUCekXUAkU4JyyFnboqxpdrXiGgGHMTif-2HazuByH29CPTiuuA">
+
+
+<script type="text/javascript">
+/*
+    功能：生成博客目录的JS工具
+    测试：IE8，火狐，google测试通过
+    zhang_derek
+    2018-01-03
+*/
+var BlogDirectory = {
+    /*
+        获取元素位置，距浏览器左边界的距离（left）和距浏览器上边界的距离（top）
+    */
+    getElementPosition:function (ele) {        
+        var topPosition = 0;
+        var leftPosition = 0;
+        while (ele){              
+            topPosition += ele.offsetTop;
+            leftPosition += ele.offsetLeft;        
+            ele = ele.offsetParent;     
+        }  
+        return {top:topPosition, left:leftPosition}; 
+    },
+
+    /*
+    获取滚动条当前位置
+    */
+    getScrollBarPosition:function () {
+        var scrollBarPosition = document.body.scrollTop || document.documentElement.scrollTop;
+        return  scrollBarPosition;
+    },
+    
+    /*
+    移动滚动条，finalPos 为目的位置，internal 为移动速度
+    */
+    moveScrollBar:function(finalpos, interval) {
+
+        //若不支持此方法，则退出
+        if(!window.scrollTo) {
+            return false;
+        }
+
+        //窗体滚动时，禁用鼠标滚轮
+        window.onmousewheel = function(){
+            return false;
+        };
+          
+        //清除计时
+        if (document.body.movement) { 
+            clearTimeout(document.body.movement); 
+        } 
+
+        var currentpos =BlogDirectory.getScrollBarPosition();//获取滚动条当前位置
+
+        var dist = 0; 
+        if (currentpos == finalpos) {//到达预定位置，则解禁鼠标滚轮，并退出
+            window.onmousewheel = function(){
+                return true;
+            }
+            return true; 
+        } 
+        if (currentpos < finalpos) {//未到达，则计算下一步所要移动的距离
+            dist = Math.ceil((finalpos - currentpos)/10); 
+            currentpos += dist; 
+        } 
+        if (currentpos > finalpos) { 
+            dist = Math.ceil((currentpos - finalpos)/10); 
+            currentpos -= dist; 
+        }
+        
+        var scrTop = BlogDirectory.getScrollBarPosition();//获取滚动条当前位置
+        window.scrollTo(0, currentpos);//移动窗口
+        if(BlogDirectory.getScrollBarPosition() == scrTop)//若已到底部，则解禁鼠标滚轮，并退出
+        {
+            window.onmousewheel = function(){
+                return true;
+            }
+            return true;
+        }
+        
+        //进行下一步移动
+        var repeat = "BlogDirectory.moveScrollBar(" + finalpos + "," + interval + ")"; 
+        document.body.movement = setTimeout(repeat, interval); 
+    },
+    
+    htmlDecode:function (text){
+        var temp = document.createElement("div");
+        temp.innerHTML = text;
+        var output = temp.innerText || temp.textContent;
+        temp = null;
+        return output;
+    },
+
+    /*
+    创建博客目录，
+    id表示包含博文正文的 div 容器的 id，
+    mt 和 st 分别表示主标题和次级标题的标签名称（如 H2、H3，大写或小写都可以！），
+    interval 表示移动的速度
+    */
+    createBlogDirectory:function (id, mt, st, interval){
+         //获取博文正文div容器
+        var elem = document.getElementById(id);
+        if(!elem) return false;
+        //获取div中所有元素结点
+        var nodes = elem.getElementsByTagName("*");
+        //创建博客目录的div容器
+        var divSideBar = document.createElement('DIV');
+        divSideBar.className = 'uprightsideBar';
+        divSideBar.setAttribute('id', 'uprightsideBar');
+        var divSideBarTab = document.createElement('DIV');
+        divSideBarTab.setAttribute('id', 'sideBarTab');
+        divSideBar.appendChild(divSideBarTab);
+        var h2 = document.createElement('H2');
+        divSideBarTab.appendChild(h2);
+        var txt = document.createTextNode('目录导航');
+        h2.appendChild(txt);
+        var divSideBarContents = document.createElement('DIV');
+        divSideBarContents.style.display = 'none';
+        divSideBarContents.setAttribute('id', 'sideBarContents');
+        divSideBar.appendChild(divSideBarContents);
+        //创建自定义列表
+        var dlist = document.createElement("dl");
+        divSideBarContents.appendChild(dlist);
+        var num = 0;//统计找到的mt和st
+        mt = mt.toUpperCase();//转化成大写
+        st = st.toUpperCase();//转化成大写
+        //遍历所有元素结点
+        for(var i=0; i<nodes.length; i++)
+        {
+            if(nodes[i].nodeName == mt|| nodes[i].nodeName == st)    
+            {
+                //获取标题文本
+                var nodetext = nodes[i].innerHTML.replace(/<\/?[^>]+>/g,"");//innerHTML里面的内容可能有HTML标签，所以用正则表达式去除HTML的标签
+                nodetext = nodetext.replace(/ /ig, "");//替换掉所有的 
+                nodetext = BlogDirectory.htmlDecode(nodetext);
+                //插入锚        
+                nodes[i].setAttribute("id", "blogTitle" + num);
+                var item;
+                switch(nodes[i].nodeName)
+                {
+                    case mt:    //若为主标题 
+                        item = document.createElement("dt");
+                        break;
+                    case st:    //若为子标题
+                        item = document.createElement("dd");
+                        break;
+                }
+                
+                //创建锚链接
+                var itemtext = document.createTextNode(nodetext);
+                item.appendChild(itemtext);
+                item.setAttribute("name", num);
+                item.onclick = function(){        //添加鼠标点击触发函数
+                    var pos = BlogDirectory.getElementPosition(document.getElementById("blogTitle" + this.getAttribute("name")));
+                    if(!BlogDirectory.moveScrollBar(pos.top, interval)) return false;
+                };            
+                
+                //将自定义表项加入自定义列表中
+                dlist.appendChild(item);
+                num++;
+            }
+        }
+        
+        if(num == 0) return false; 
+        /*鼠标进入时的事件处理*/
+        divSideBarTab.onmouseenter = function(){
+            divSideBarContents.style.display = 'block';
+        }
+        /*鼠标离开时的事件处理*/
+        divSideBar.onmouseleave = function() {
+            divSideBarContents.style.display = 'none';
+        }
+
+        document.body.appendChild(divSideBar);
+    }
+    
+};
+
+window.onload=function(){
+    /*页面加载完成之后生成博客目录*/
+    BlogDirectory.createBlogDirectory("cnblogs_post_body","h2","h3",20);
+}
+</script><script type="text/javascript">
+
+(function(window,document,undefined){
+        var hearts = [];
+        window.requestAnimationFrame = (function(){
+                return window.requestAnimationFrame || 
+                           window.webkitRequestAnimationFrame ||
+                           window.mozRequestAnimationFrame ||
+                           window.oRequestAnimationFrame ||
+                           window.msRequestAnimationFrame ||
+                           function (callback){
+                                   setTimeout(callback,1000/60);
+                           }
+        })();
+        init();
+        function init(){
+                css(".heart{width: 10px;height: 10px;position: fixed;background: #f00;transform: rotate(45deg);-webkit-transform: rotate(45deg);-moz-transform: rotate(45deg);}.heart:after,.heart:before{content: '';width: inherit;height: inherit;background: inherit;border-radius: 50%;-webkit-border-radius: 50%;-moz-border-radius: 50%;position: absolute;}.heart:after{top: -5px;}.heart:before{left: -5px;}");
+                attachEvent();
+                gameloop();
+        }
+        function gameloop(){
+                for(var i=0;i<hearts.length;i++){
+                    if(hearts[i].alpha <=0){
+                            document.body.removeChild(hearts[i].el);
+                            hearts.splice(i,1);
+                            continue;
+                    }
+                    hearts[i].y--;
+                    hearts[i].scale += 0.004;
+                    hearts[i].alpha -= 0.013;
+                    hearts[i].el.style.cssText = "left:"+hearts[i].x+"px;top:"+hearts[i].y+"px;opacity:"+hearts[i].alpha+";transform:scale("+hearts[i].scale+","+hearts[i].scale+") rotate(45deg);background:"+hearts[i].color;
+            }
+            requestAnimationFrame(gameloop);
+        }
+        function attachEvent(){
+                var old = typeof window.onclick==="function" && window.onclick;
+                window.onclick = function(event){
+                        old && old();
+                        createHeart(event);
+                }
+        }
+        function createHeart(event){
+            var d = document.createElement("div");
+            d.className = "heart";
+            hearts.push({
+                    el : d,
+                    x : event.clientX - 5,
+                    y : event.clientY - 5,
+                    scale : 1,
+                    alpha : 1,
+                    color : randomColor()
+            });
+            document.body.appendChild(d);
+    }
+    function css(css){
+            var style = document.createElement("style");
+                style.type="text/css";
+                try{
+                    style.appendChild(document.createTextNode(css));
+                }catch(ex){
+                    style.styleSheet.cssText = css;
+                }
+                document.getElementsByTagName('head')[0].appendChild(style);
+    }
+        function randomColor(){
+                return "rgb("+(~~(Math.random()*255))+","+(~~(Math.random()*255))+","+(~~(Math.random()*255))+")";
+        }
+})(window,document);
+
+</script><script type="text/javascript">window._bd_share_config={"common":{"bdSnsKey":{},"bdText":"","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"16"},"slide":{"type":"slide","bdImg":"6","bdPos":"right","bdTop":"135"},"image":{"viewList":["qzone","tsina","tqq","renren","weixin"],"viewText":"分享到：","viewSize":"16"}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];</script><script type="text/javascript">getFollowStatus('238792d9-f4d4-4d4d-d3b3-08d5a91b4f51');</script><iframe src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/container.html" style="visibility: hidden; display: none;"></iframe><iframe id="google_osd_static_frame_1927952667000" name="google_osd_static_frame" style="display: none; width: 0px; height: 0px;" src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/saved_resource(2).html"></iframe><div class="uprightsideBar" id="uprightsideBar"><div id="sideBarTab"><h2>目录导航</h2></div><div id="sideBarContents" style="display: none;"><dl><dt name="0">一、RDD的概述</dt><dd name="1">1.1什么是RDD&nbsp;</dd><dd name="2">1.2RDD的属性</dd><dd name="3">1.3WordCount粗图解RDD</dd><dt name="4">二、RDD的创建方式</dt><dd name="5">2.1读取文件生成</dd><dd name="6">2.2并行化方式创建RDD</dd><dd name="7">2.3其他方式</dd><dt name="8">三、RDD编程API</dt><dd name="9">3.1Transformation</dd><dd name="10">3.2Action</dd><dd name="11">3.3WordCount代码编写</dd><dd name="12">3.4WordCount执行过程图</dd><dt name="13">四、RDD的宽依赖和窄依赖</dt><dd name="14">4.1&nbsp;RDD依赖关系的本质内幕</dd><dd name="15">4.2&nbsp;依赖关系下的数据流视图</dd><dt name="16">五、广播变量与累加器</dt><dt name="17">六、广播变量broadcastvariable</dt><dd name="18">6.1广播变量的意义</dd><dd name="19">6.2广播变量图解</dd><dd name="20">6.3如何定义一个广播变量</dd><dd name="21">6.4如何还原一个广播变量</dd><dd name="22">6.5广播变量使用</dd><dd name="23">6.6定义广播变量注意点&nbsp;</dd><dd name="24">6.7&nbsp;注意事项</dd><dt name="25">七、累加器&nbsp;</dt><dd name="26">7.1累加器的意义</dd><dd name="27">7.2图解累加器</dd><dd name="28">7.3如何定义一个累加器&nbsp;</dd><dd name="29">7.4如何还原一个累加器&nbsp;</dd><dd name="30">7.5累加器的使用</dd><dd name="31">7.6&nbsp;注意事项</dd></dl></div></div><iframe src="./Spark（三）RDD与广播变量、累加器 - Frankdeng - 博客园_files/aframe.html" width="0" height="0" style="display: none;"></iframe></body></html>
